@@ -7,14 +7,21 @@
 
 import SwiftUI
 
-/// 应用入口, 负责创建 SwiftUI 场景并加载根视图。
-
+/// 应用入口, 通过菜单栏图标提供唯一的设置界面并默认启动 Cmd+Q 监听。
 @main
 struct SlowQuitAppsSwiftApp: App {
-    /// macOS 应用只需要一个默认的 WindowGroup, 其中承载 ContentView。
+    @StateObject private var controller = CmdQController()
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra("SlowQuitAppsSwift", systemImage: "keyboard") {
+            ContentView(controller: controller)
+                .frame(width: 320)
+        }
+        .menuBarExtraStyle(.window)
+
+        Settings {
+            ContentView(controller: controller)
+                .frame(width: 360)
         }
     }
 }
