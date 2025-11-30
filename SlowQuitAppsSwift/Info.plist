@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>SlowQuitAppsSwift 需要 Apple Events 权限来控制应用行为</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>SlowQuitAppsSwift 需要辅助功能权限来监听全局键盘事件，实现 Cmd-Q 延迟退出功能</string>
+</dict>
+</plist>
