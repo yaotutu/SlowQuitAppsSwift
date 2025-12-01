@@ -42,10 +42,46 @@ jobs:
       run: |
         cd build/Build/Products/Release
 
-        # 创建 DMG（更专业的分发方式）
+        # 创建 DMG 临时目录
         mkdir -p dmg_temp
         cp -R SlowQuitAppsSwift.app dmg_temp/
-        hdiutil create -volname "SlowQuitAppsSwift" -srcfolder dmg_temp -ov -format UDZO SlowQuitAppsSwift.dmg
+
+        # 创建 Applications 文件夹的符号链接
+        ln -s /Applications dmg_temp/Applications
+
+        # 创建临时 DMG
+        hdiutil create -volname "SlowQuitAppsSwift" -srcfolder dmg_temp -ov -format UDRW temp.dmg
+
+        # 挂载临时 DMG 以设置窗口属性
+        hdiutil attach temp.dmg -noverify -nobrowse -mountpoint /Volumes/SlowQuitAppsSwift
+
+        # 设置 Finder 窗口属性（图标位置和窗口大小）
+        echo '
+          tell application "Finder"
+            tell disk "SlowQuitAppsSwift"
+              open
+              set current view of container window to icon view
+              set toolbar visible of container window to false
+              set statusbar visible of container window to false
+              set the bounds of container window to {400, 100, 900, 450}
+              set viewOptions to the icon view options of container window
+              set arrangement of viewOptions to not arranged
+              set icon size of viewOptions to 100
+              set position of item "SlowQuitAppsSwift.app" of container window to {125, 180}
+              set position of item "Applications" of container window to {375, 180}
+              update without registering applications
+              delay 2
+              close
+            end tell
+          end tell
+        ' | osascript
+
+        # 卸载临时 DMG
+        hdiutil detach /Volumes/SlowQuitAppsSwift
+
+        # 转换为压缩的只读 DMG
+        hdiutil convert temp.dmg -format UDZO -o SlowQuitAppsSwift.dmg
+        rm temp.dmg
         rm -rf dmg_temp
 
         # 同时创建 ZIP（兼容性更好）
