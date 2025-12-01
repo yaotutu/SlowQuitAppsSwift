@@ -33,6 +33,8 @@ final class EventMonitor {
     private var holdTimer: DispatchSourceTimer?
     /// 是否正在发送模拟 Cmd+Q, 防止再次触发监听逻辑。
     private var isSimulatingCmdQ = false
+    /// 长按完成后等待用户抬起按键。
+    private var waitForPhysicalKeyUp = false
     /// 当前长按阈值 (秒), 可动态调整。
     var holdDuration: TimeInterval
     /// Q 键的虚拟键值。
@@ -52,6 +54,7 @@ final class EventMonitor {
         holdTimer?.cancel()
         holdTimer = nil
         isCmdQActive = false
+        waitForPhysicalKeyUp = false
 
         if let runLoopSource = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
@@ -118,6 +121,12 @@ final class EventMonitor {
             if isSimulatingCmdQ {
                 return Unmanaged.passRetained(event)
             }
+            if waitForPhysicalKeyUp {
+                if type == .keyUp {
+                    waitForPhysicalKeyUp = false
+                }
+                return nil
+            }
             if type == .keyDown {
                 if let allow = shouldHandleCmdQ?(), allow == false {
                     return Unmanaged.passRetained(event)
@@ -167,6 +176,7 @@ final class EventMonitor {
         holdTimer?.cancel()
         holdTimer = nil
         isCmdQActive = false
+        waitForPhysicalKeyUp = true
         onCmdQHoldComplete?()
         sendSyntheticCmdQ()
     }

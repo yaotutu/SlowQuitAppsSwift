@@ -121,7 +121,10 @@ final class HoldOverlayWindowController: ObservableObject {
     private func startTimer() {
         progressTimer?.invalidate()
         let timer = Timer(timeInterval: 0.02, repeats: true) { [weak self] _ in
-            self?.handleTick()
+            guard let self else { return }
+            Task { @MainActor in
+                self.handleTick()
+            }
         }
         progressTimer = timer
         RunLoop.main.add(timer, forMode: .common)

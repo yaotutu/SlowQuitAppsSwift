@@ -1,6 +1,7 @@
 import Foundation
 
 /// 负责管理用户偏好设置, 目前提供长按时长与圆环可见性。
+@MainActor
 final class PreferencesManager {
 
     static let shared = PreferencesManager()

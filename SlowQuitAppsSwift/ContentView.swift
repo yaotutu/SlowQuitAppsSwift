@@ -8,70 +8,102 @@
 import SwiftUI
 import AppKit
 
-/// 菜单栏中的简洁控制面板。
+/// 菜单栏菜单项，使用原生菜单样式。
 struct ContentView: View {
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var controller: CmdQController
 
+    private let projectURL = URL(string: "https://github.com/yaotutu/SlowQuitAppsSwift")!
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("显示", systemImage: "eye")
-                .font(.headline)
-                .padding(.bottom, 4)
+        Group {
+            Label(permissionStatusText, systemImage: controller.hasAccessibilityPermission ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                .foregroundColor(controller.hasAccessibilityPermission ? .green : .orange)
 
-            Divider()
-
-            Button("Settings…") {
+            Button {
                 openWindow(id: "settings")
                 NSApp?.activate(ignoringOtherApps: true)
+            } label: {
+                Label("Settings…", systemImage: "gearshape")
             }
             .keyboardShortcut(",", modifiers: .command)
 
-            Button("检查权限…") {
-                controller.requestAccessibilityPermission()
+            Button {
+                handlePermissionCheck()
+            } label: {
+                Label("检查权限…", systemImage: "shield.lefthalf.filled")
             }
 
-            Button("检查更新…") {
-                // TODO: 后续集成更新检查
+            if !controller.hasAccessibilityPermission {
+                Button {
+                    controller.openAccessibilitySettings()
+                } label: {
+                    Label("打开辅助功能设置…", systemImage: "gearshape.2")
+                }
+            }
+
+            Button {
+                openProjectPage()
+            } label: {
+                Label("检查更新…", systemImage: "clock.arrow.circlepath")
             }
 
             Divider()
 
-            Button("关于 SlowQuitAppsSwift") {
+            Button {
                 NSApplication.shared.orderFrontStandardAboutPanel(nil)
                 NSApp?.activate(ignoringOtherApps: true)
+            } label: {
+                Label("关于 SlowQuitAppsSwift", systemImage: "info.circle")
             }
 
-            Button("发送反馈…") {
-                if let url = URL(string: "mailto:slowquitapps@example.com") {
-                    NSWorkspace.shared.open(url)
-                }
+            Button {
+                openProjectPage()
+            } label: {
+                Label("发送反馈…", systemImage: "text.bubble")
             }
 
-            Button("支持项目 ❤️") {
-                if let url = URL(string: "https://github.com/dteoh/SlowQuitApps") {
-                    NSWorkspace.shared.open(url)
-                }
+            Button {
+                openProjectPage()
+            } label: {
+                Label("支持项目 ❤️", systemImage: "heart.fill")
             }
 
             Divider()
 
-            Button("退出 SlowQuitAppsSwift") {
+            Button {
                 NSApplication.shared.terminate(nil)
+            } label: {
+                Label("退出 SlowQuitAppsSwift", systemImage: "rectangle.portrait.and.arrow.right")
             }
-            .keyboardShortcut("q", modifiers: [.command])
+            .keyboardShortcut("q", modifiers: .command)
         }
-        .buttonStyle(.plain)
-        .padding(.vertical, 8)
-        .padding(.horizontal, 16)
-        .frame(minWidth: 220)
     }
 
-    private var statusMessage: String {
-        if controller.hasAccessibilityPermission {
-            return controller.isMonitoring ? "监听 Cmd+Q 中..." : "可以开始监听 Cmd+Q"
+    private func openProjectPage() {
+        NSWorkspace.shared.open(projectURL)
+    }
+
+    private func handlePermissionCheck() {
+        let status = controller.reportPermissionStatus()
+        if status.granted {
+            presentAlert(title: "权限已授予", detail: status.message)
+        } else {
+            presentAlert(title: "需要辅助功能权限", detail: status.message)
+            controller.requestAccessibilityPermission()
         }
-        return "等待辅助功能授权"
+    }
+
+    private func presentAlert(title: String, detail: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = detail
+        alert.addButton(withTitle: "确定")
+        alert.runModal()
+    }
+
+    private var permissionStatusText: String {
+        controller.hasAccessibilityPermission ? "辅助功能权限已授予" : "需要辅助功能权限"
     }
 }
 
@@ -79,32 +111,82 @@ struct SettingsView: View {
     @ObservedObject var controller: CmdQController
 
     var body: some View {
-        Form {
-            Section("基础设置") {
-                HStack {
-                    Text("长按时长")
-                    Spacer()
-                    Text("\(controller.holdDuration, specifier: "%.1f") 秒")
-                        .foregroundColor(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                GroupBox("辅助功能权限") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            Image(systemName: controller.hasAccessibilityPermission ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                                .foregroundColor(controller.hasAccessibilityPermission ? .green : .orange)
+                                .font(.system(size: 28))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(controller.hasAccessibilityPermission ? "已获得辅助功能权限" : "尚未获得辅助功能权限")
+                                    .font(.headline)
+                                Text("SlowQuitAppsSwift 需要辅助功能才能监听 Cmd+Q。")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        HStack {
+                            Button("重新检测") { controller.checkAccessibilityPermission() }
+                            Button("打开系统设置") { controller.openAccessibilitySettings() }
+                            Spacer()
+                        }
+                    }
+                    .padding()
                 }
-                Slider(value: $controller.holdDuration, in: 0.5...5, step: 0.5)
 
-                Toggle("显示长按提示", isOn: $controller.displayOverlay)
+                GroupBox("基础设置") {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack {
+                            Text("长按时长")
+                            Spacer()
+                            Text("\(controller.holdDuration, specifier: "%.1f") 秒")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $controller.holdDuration, in: 0.5...5, step: 0.5)
+                        Toggle("显示长按提示", isOn: $controller.displayOverlay)
+                    }
+                    .padding()
+                }
+
+                GroupBox("应用例外列表") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("添加应用 Bundle ID 来快速跳过或仅针对特定应用启用延迟。")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        List {
+                            ForEach(Array(controller.bundleIdentifiers.enumerated()), id: \.offset) { index, value in
+                                HStack {
+                                    TextField("com.example.App", text: Binding(
+                                        get: { value },
+                                        set: { controller.updateBundleIdentifier(at: index, with: $0) }
+                                    ))
+                                    Button(role: .destructive) {
+                                        controller.removeBundleIdentifiers(at: IndexSet(integer: index))
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                            }
+                        }
+                        .frame(height: 220)
+
+                        HStack {
+                            Button("添加当前应用") { controller.addFrontmostApplication() }
+                            Button("添加空白行") { controller.addEmptyBundleIdentifier() }
+                            Spacer()
+                        }
+
+                        Toggle(controller.invertList ? "仅延迟上述应用" : "跳过上述应用", isOn: $controller.invertList)
+                    }
+                    .padding()
+                }
             }
-
-            Section("应用例外列表") {
-                Text("每行输入一个 Bundle ID。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                TextEditor(text: $controller.appListText)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(height: 150)
-
-                Toggle(controller.invertList ? "仅对上述应用添加延迟" : "跳过上述应用",
-                       isOn: $controller.invertList)
-            }
+            .padding(24)
         }
-        .padding()
+        .frame(minWidth: 460)
     }
 }

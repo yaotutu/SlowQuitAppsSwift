@@ -23,9 +23,8 @@ final class CmdQController: ObservableObject {
             }
         }
     }
-    @Published var appListText: String {
+    @Published var bundleIdentifiers: [String] {
         didSet {
-            bundleIdentifiers = Self.parseBundleList(from: appListText)
             preferences.bundleIdentifiers = bundleIdentifiers
         }
     }
@@ -38,14 +37,12 @@ final class CmdQController: ObservableObject {
     private let preferences: PreferencesManager
     private var eventMonitor: EventMonitor?
     private let holdOverlayController = HoldOverlayWindowController()
-    private var bundleIdentifiers: [String]
 
     init(preferences: PreferencesManager = .shared) {
         self.preferences = preferences
         self.holdDuration = preferences.holdDuration
         self.displayOverlay = preferences.displayOverlay
         self.bundleIdentifiers = preferences.bundleIdentifiers
-        self.appListText = bundleIdentifiers.joined(separator: "\n")
         self.invertList = preferences.invertList
         DispatchQueue.main.async {
             self.checkAccessibilityPermission(autoStart: true)
@@ -74,6 +71,14 @@ final class CmdQController: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             self.checkAccessibilityPermission(autoStart: true)
         }
+    }
+
+    func reportPermissionStatus() -> (granted: Bool, message: String) {
+        let promptKey = kAXTrustedCheckOptionPrompt.takeRetainedValue() as String
+        let options = [promptKey: NSNumber(value: false)] as CFDictionary
+        let granted = AXIsProcessTrustedWithOptions(options)
+        let message = granted ? "辅助功能权限已授予。" : "缺少权限，请在“隐私与安全性 → 辅助功能”中勾选 SlowQuitAppsSwift。"
+        return (granted, message)
     }
 
     func openAccessibilitySettings() {
@@ -123,7 +128,10 @@ final class CmdQController: ObservableObject {
     }
 
     private func shouldHandleCmdQ() -> Bool {
-        guard !bundleIdentifiers.isEmpty else {
+        let identifiers = bundleIdentifiers
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !identifiers.isEmpty else {
             return true
         }
         guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else {
@@ -131,17 +139,33 @@ final class CmdQController: ObservableObject {
         }
         if invertList {
             // 黑名单模式: 只有列表内的应用才延迟
-            return bundleIdentifiers.contains(where: { $0.caseInsensitiveCompare(bundleID) == .orderedSame })
+            return identifiers.contains(where: { $0.caseInsensitiveCompare(bundleID) == .orderedSame })
         } else {
             // 白名单: 列表内的是豁免, 其他都延迟
-            return !bundleIdentifiers.contains(where: { $0.caseInsensitiveCompare(bundleID) == .orderedSame })
+            return !identifiers.contains(where: { $0.caseInsensitiveCompare(bundleID) == .orderedSame })
         }
     }
 
-    private static func parseBundleList(from text: String) -> [String] {
-        text
-            .components(separatedBy: CharacterSet(charactersIn: ",\n"))
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+    func updateBundleIdentifier(at index: Int, with value: String) {
+        guard bundleIdentifiers.indices.contains(index) else { return }
+        bundleIdentifiers[index] = value
+    }
+
+    func removeBundleIdentifiers(at offsets: IndexSet) {
+        bundleIdentifiers = bundleIdentifiers.enumerated()
+            .filter { !offsets.contains($0.offset) }
+            .map { $0.element }
+    }
+
+    func addEmptyBundleIdentifier() {
+        bundleIdentifiers.append("")
+    }
+
+    func addFrontmostApplication() {
+        guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return }
+        guard bundleID != Bundle.main.bundleIdentifier else { return }
+        if !bundleIdentifiers.contains(where: { $0.caseInsensitiveCompare(bundleID) == .orderedSame }) {
+            bundleIdentifiers.append(bundleID)
+        }
     }
 }
