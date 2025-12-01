@@ -1,0 +1,167 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - release-main
+      - release-dev
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    name: Build and Release macOS App
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+    - name: Show Xcode version
+      run: xcodebuild -version
+
+    - name: Import Code Signing Certificates
+      if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      run: |
+        # 创建临时 keychain
+        security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+        security set-keychain-settings -t 3600 -u build.keychain
+
+        # 导入证书
+        echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
+        security import certificate.p12 -k build.keychain -P "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
+
+        # 清理
+        rm certificate.p12
+
+    - name: Build Release
+      run: |
+        if [ -n "${{ secrets.MACOS_CERTIFICATE }}" ]; then
+          # 有签名证书，进行签名构建
+          xcodebuild \
+            -scheme SlowQuitAppsSwift \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath ./build \
+            clean build \
+            CODE_SIGN_IDENTITY="${{ secrets.MACOS_CERTIFICATE_NAME }}" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="${{ secrets.MACOS_TEAM_ID }}"
+        else
+          # 无签名证书，构建未签名版本
+          xcodebuild \
+            -scheme SlowQuitAppsSwift \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath ./build \
+            clean build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+        fi
+
+    - name: Notarize App
+      if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      run: |
+        # 打包为 DMG 或 ZIP 用于公证
+        cd build/Build/Products/Release
+        ditto -c -k --keepParent SlowQuitAppsSwift.app SlowQuitAppsSwift-notarize.zip
+
+        # 上传到 Apple 进行公证
+        xcrun notarytool submit SlowQuitAppsSwift-notarize.zip \
+          --apple-id "${{ secrets.APPLE_ID }}" \
+          --password "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" \
+          --team-id "${{ secrets.MACOS_TEAM_ID }}" \
+          --wait
+
+        # 装订公证票据到应用
+        xcrun stapler staple SlowQuitAppsSwift.app
+
+        # 清理临时文件
+        rm SlowQuitAppsSwift-notarize.zip
+
+    - name: Package app
+      run: |
+        cd build/Build/Products/Release
+
+        # 创建 DMG（更专业的分发方式）
+        mkdir -p dmg_temp
+        cp -R SlowQuitAppsSwift.app dmg_temp/
+        hdiutil create -volname "SlowQuitAppsSwift" -srcfolder dmg_temp -ov -format UDZO SlowQuitAppsSwift.dmg
+        rm -rf dmg_temp
+
+        # 同时创建 ZIP（兼容性更好）
+        ditto -c -k --keepParent SlowQuitAppsSwift.app SlowQuitAppsSwift.zip
+
+        mv SlowQuitAppsSwift.dmg ${{ github.workspace }}/
+        mv SlowQuitAppsSwift.zip ${{ github.workspace }}/
+
+    - name: Cleanup Keychain
+      if: always()
+      run: |
+        security delete-keychain build.keychain || true
+
+    - name: Generate version tag
+      id: version
+      run: |
+        BRANCH_NAME="${{ github.ref_name }}"
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        if [ "$BRANCH_NAME" = "release-main" ]; then
+          VERSION="v1.0.${GITHUB_RUN_NUMBER}"
+          PRERELEASE=false
+        else
+          VERSION="v0.1.${GITHUB_RUN_NUMBER}-dev"
+          PRERELEASE=true
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+        echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: Release ${{ steps.version.outputs.version }}
+        body: |
+          ## SlowQuitAppsSwift ${{ steps.version.outputs.version }}
+
+          **构建分支:** ${{ github.ref_name }}
+          **构建时间:** ${{ steps.version.outputs.timestamp }}
+          **提交:** ${{ github.sha }}
+
+          ### 安装方法
+
+          **推荐：使用 DMG 安装**
+          1. 下载 `SlowQuitAppsSwift.dmg`
+          2. 双击 DMG 文件打开
+          3. 将 `SlowQuitAppsSwift.app` 拖入"应用程序"文件夹
+          4. 双击启动应用
+          5. 在"系统设置 → 隐私与安全性 → 辅助功能"中授予权限
+
+          **备选：使用 ZIP 安装**
+          1. 下载 `SlowQuitAppsSwift.zip`
+          2. 解压后将 `SlowQuitAppsSwift.app` 拖入"应用程序"文件夹
+          3. 双击启动应用
+          4. 在"系统设置 → 隐私与安全性 → 辅助功能"中授予权限
+
+          ### 注意事项
+          - ✅ 已签名和公证（如果配置了证书）：可以直接双击打开
+          - ⚠️ 未签名版本：需要右键点击选择"打开"
+
+          ### 变更日志
+          查看完整提交历史: ${{ github.event.compare }}
+        files: |
+          SlowQuitAppsSwift.dmg
+          SlowQuitAppsSwift.zip
+        draft: false
+        prerelease: ${{ steps.version.outputs.prerelease }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
