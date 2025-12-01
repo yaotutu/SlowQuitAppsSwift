@@ -10,9 +10,22 @@
 		CBA7770D2ED9C35A002238E2 /* SlowQuitAppsSwift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlowQuitAppsSwift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CBA7771C2ED9D36A002238E2 /* Exceptions for "SlowQuitAppsSwift" folder in "SlowQuitAppsSwift" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CBA7770C2ED9C35A002238E2 /* SlowQuitAppsSwift */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CBA7770F2ED9C35A002238E2 /* SlowQuitAppsSwift */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CBA7771C2ED9D36A002238E2 /* Exceptions for "SlowQuitAppsSwift" folder in "SlowQuitAppsSwift" target */,
+			);
 			path = SlowQuitAppsSwift;
 			sourceTree = "<group>";
 		};
@@ -254,11 +267,14 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = YV4QPBC7BG;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SlowQuitAppsSwift/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SlowQuitAppsSwift;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "SlowQuitAppsSwift 需要 Apple Events 权限来控制应用行为";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -286,11 +302,14 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = YV4QPBC7BG;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SlowQuitAppsSwift/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SlowQuitAppsSwift;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "SlowQuitAppsSwift 需要 Apple Events 权限来控制应用行为";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

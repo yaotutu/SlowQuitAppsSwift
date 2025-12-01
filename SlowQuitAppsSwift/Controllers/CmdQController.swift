@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import AppKit
 import ApplicationServices
 
@@ -8,16 +9,44 @@ final class CmdQController: ObservableObject {
 
     @Published var isMonitoring = false
     @Published var hasAccessibilityPermission = false
-    @Published var holdDuration: TimeInterval = 1.0 {
+    @Published var holdDuration: TimeInterval {
         didSet {
+            preferences.holdDuration = holdDuration
             eventMonitor?.holdDuration = holdDuration
         }
     }
+    @Published var displayOverlay: Bool {
+        didSet {
+            preferences.displayOverlay = displayOverlay
+            if !displayOverlay {
+                holdOverlayController.forceHide()
+            }
+        }
+    }
+    @Published var appListText: String {
+        didSet {
+            bundleIdentifiers = Self.parseBundleList(from: appListText)
+            preferences.bundleIdentifiers = bundleIdentifiers
+        }
+    }
+    @Published var invertList: Bool {
+        didSet {
+            preferences.invertList = invertList
+        }
+    }
 
+    private let preferences: PreferencesManager
     private var eventMonitor: EventMonitor?
     private let holdOverlayController = HoldOverlayWindowController()
+    private var bundleIdentifiers: [String]
 
-    init() {
+    init(preferences: PreferencesManager = .shared) {
+        self.preferences = preferences
+        self.holdDuration = preferences.holdDuration
+        self.displayOverlay = preferences.displayOverlay
+        self.bundleIdentifiers = preferences.bundleIdentifiers
+        self.appListText = bundleIdentifiers.joined(separator: "\n")
+        self.invertList = preferences.invertList
         DispatchQueue.main.async {
             self.checkAccessibilityPermission(autoStart: true)
         }
@@ -59,15 +88,26 @@ final class CmdQController: ObservableObject {
         guard !isMonitoring else { return }
 
         let monitor = EventMonitor(holdDuration: holdDuration)
+        monitor.shouldHandleCmdQ = { [weak self] in
+            return self?.shouldHandleCmdQ() ?? true
+        }
         monitor.onCmdQHoldStart = { [weak self] in
             guard let self = self else { return }
-            self.holdOverlayController.startHold(duration: self.holdDuration)
+            if self.displayOverlay {
+                self.holdOverlayController.startHold(duration: self.holdDuration)
+            }
         }
         monitor.onCmdQHoldCancel = { [weak self] in
-            self?.holdOverlayController.cancelHold()
+            guard let self = self else { return }
+            if self.displayOverlay {
+                self.holdOverlayController.cancelHold()
+            }
         }
         monitor.onCmdQHoldComplete = { [weak self] in
-            self?.holdOverlayController.completeHold()
+            guard let self = self else { return }
+            if self.displayOverlay {
+                self.holdOverlayController.completeHold()
+            }
         }
 
         monitor.start()
@@ -80,5 +120,28 @@ final class CmdQController: ObservableObject {
         eventMonitor = nil
         isMonitoring = false
         holdOverlayController.forceHide()
+    }
+
+    private func shouldHandleCmdQ() -> Bool {
+        guard !bundleIdentifiers.isEmpty else {
+            return true
+        }
+        guard let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else {
+            return true
+        }
+        if invertList {
+            // 黑名单模式: 只有列表内的应用才延迟
+            return bundleIdentifiers.contains(where: { $0.caseInsensitiveCompare(bundleID) == .orderedSame })
+        } else {
+            // 白名单: 列表内的是豁免, 其他都延迟
+            return !bundleIdentifiers.contains(where: { $0.caseInsensitiveCompare(bundleID) == .orderedSame })
+        }
+    }
+
+    private static func parseBundleList(from text: String) -> [String] {
+        text
+            .components(separatedBy: CharacterSet(charactersIn: ",\n"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 }

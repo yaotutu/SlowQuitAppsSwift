@@ -15,13 +15,17 @@ struct SlowQuitAppsSwiftApp: App {
     var body: some Scene {
         MenuBarExtra("SlowQuitAppsSwift", systemImage: "keyboard") {
             ContentView(controller: controller)
-                .frame(width: 320)
+                .frame(width: 260)
         }
         .menuBarExtraStyle(.window)
 
-        Settings {
-            ContentView(controller: controller)
-                .frame(width: 360)
+        WindowGroup(id: "settings") {
+            SettingsView(controller: controller)
+                .frame(width: 380, height: 420)
         }
+    }
+
+    var commands: some Commands {
+        AppCommands()
     }
 }

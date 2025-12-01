@@ -19,6 +19,8 @@ final class EventMonitor {
     private var eventTap: CFMachPort?
     /// RunLoopSource 将 Mach 端口连接到当前 RunLoop。
     private var runLoopSource: CFRunLoopSource?
+    /// 在决定是否处理 Cmd+Q 前调用的过滤器。
+    var shouldHandleCmdQ: (() -> Bool)?
     /// 按住 Cmd+Q 开始时的回调。
     var onCmdQHoldStart: (() -> Void)?
     /// 提前松开 Cmd+Q, 取消退出的回调。
@@ -117,6 +119,9 @@ final class EventMonitor {
                 return Unmanaged.passRetained(event)
             }
             if type == .keyDown {
+                if let allow = shouldHandleCmdQ?(), allow == false {
+                    return Unmanaged.passRetained(event)
+                }
                 if !isCmdQActive {
                     beginCmdQHold()
                 }

@@ -6,89 +6,105 @@
 //
 
 import SwiftUI
+import AppKit
 
-/// 菜单栏触发的唯一设置界面, 控制辅助功能授权与 Cmd+Q 监听状态。
+/// 菜单栏中的简洁控制面板。
 struct ContentView: View {
-
+    @Environment(\.openWindow) private var openWindow
     @ObservedObject var controller: CmdQController
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: controller.isMonitoring ? "keyboard" : "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("SlowQuitAppsSwift")
-                .font(.title2)
-            Text(statusMessage)
-                .font(.callout)
-                .foregroundColor(controller.hasAccessibilityPermission ? .green : .orange)
-
-            if controller.hasAccessibilityPermission {
-                monitoringControls
-            } else {
-                permissionInstructions
-            }
+        VStack(alignment: .leading, spacing: 6) {
+            Label("显示", systemImage: "eye")
+                .font(.headline)
+                .padding(.bottom, 4)
 
             Divider()
-            Button("退出 SlowQuitAppsSwift") {
-                NSApplication.shared.terminate(nil)
+
+            Button("Settings…") {
+                openWindow(id: "settings")
+                NSApp?.activate(ignoringOtherApps: true)
             }
-            .buttonStyle(.borderless)
-        }
-        .padding()
-    }
+            .keyboardShortcut(",", modifiers: .command)
 
-    /// 权限已授予时的操作区。
-    private var monitoringControls: some View {
-        VStack(spacing: 8) {
-            if controller.isMonitoring {
-                Button("停止监听") {
-                    controller.stopMonitoring()
-                }
-            } else {
-                Button("开始监听") {
-                    controller.startMonitoring()
-                }
-            }
-            Text("拥有辅助功能权限，Cmd+Q 事件将被拦截用于自定义延迟逻辑。")
-                .font(.footnote)
-                .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("长按时长: \(controller.holdDuration, specifier: "%.1f") 秒")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Slider(value: $controller.holdDuration, in: 0.5...5, step: 0.5)
-            }
-        }
-    }
-
-    /// 权限缺失时的引导操作。
-    private var permissionInstructions: some View {
-        VStack(spacing: 8) {
-            Text("需要在 系统设置 → 隐私与安全性 → 辅助功能 中勾选 SlowQuitAppsSwift。")
-                .font(.footnote)
-                .multilineTextAlignment(.center)
-
-            Button("请求辅助功能权限") {
+            Button("检查权限…") {
                 controller.requestAccessibilityPermission()
             }
 
-            Button("重新检测权限") {
-                controller.checkAccessibilityPermission()
+            Button("检查更新…") {
+                // TODO: 后续集成更新检查
             }
 
-            Button("打开辅助功能设置") {
-                controller.openAccessibilitySettings()
+            Divider()
+
+            Button("关于 SlowQuitAppsSwift") {
+                NSApplication.shared.orderFrontStandardAboutPanel(nil)
+                NSApp?.activate(ignoringOtherApps: true)
             }
+
+            Button("发送反馈…") {
+                if let url = URL(string: "mailto:slowquitapps@example.com") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+
+            Button("支持项目 ❤️") {
+                if let url = URL(string: "https://github.com/dteoh/SlowQuitApps") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+
+            Divider()
+
+            Button("退出 SlowQuitAppsSwift") {
+                NSApplication.shared.terminate(nil)
+            }
+            .keyboardShortcut("q", modifiers: [.command])
         }
+        .buttonStyle(.plain)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .frame(minWidth: 220)
     }
 
     private var statusMessage: String {
         if controller.hasAccessibilityPermission {
             return controller.isMonitoring ? "监听 Cmd+Q 中..." : "可以开始监听 Cmd+Q"
         }
-        return "等待授权辅助功能权限"
+        return "等待辅助功能授权"
+    }
+}
+
+struct SettingsView: View {
+    @ObservedObject var controller: CmdQController
+
+    var body: some View {
+        Form {
+            Section("基础设置") {
+                HStack {
+                    Text("长按时长")
+                    Spacer()
+                    Text("\(controller.holdDuration, specifier: "%.1f") 秒")
+                        .foregroundColor(.secondary)
+                }
+                Slider(value: $controller.holdDuration, in: 0.5...5, step: 0.5)
+
+                Toggle("显示长按提示", isOn: $controller.displayOverlay)
+            }
+
+            Section("应用例外列表") {
+                Text("每行输入一个 Bundle ID。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                TextEditor(text: $controller.appListText)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(height: 150)
+
+                Toggle(controller.invertList ? "仅对上述应用添加延迟" : "跳过上述应用",
+                       isOn: $controller.invertList)
+            }
+        }
+        .padding()
     }
 }

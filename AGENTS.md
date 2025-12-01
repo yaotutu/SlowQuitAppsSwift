@@ -21,3 +21,4 @@ History currently favors short Title Case summaries (“Initial Commit”), so c
 The app depends on macOS Accessibility privileges for global key monitoring. Always verify `Info.plist` keys and `.entitlements` changes in both Debug and Release configurations, and document manual setup steps when test plans require revoking or re-granting permissions.
 
 - 始终用中文回答我的问题
+- 每一行代码都要有详细的注释
