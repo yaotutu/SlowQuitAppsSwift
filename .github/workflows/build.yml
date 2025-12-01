@@ -25,7 +25,7 @@ jobs:
       run: xcodebuild -version
 
     - name: Import Code Signing Certificates
-      if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      if: secrets.MACOS_CERTIFICATE != ''
       run: |
         # 创建临时 keychain
         security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" build.keychain
@@ -68,7 +68,7 @@ jobs:
         fi
 
     - name: Notarize App
-      if: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      if: secrets.MACOS_CERTIFICATE != ''
       run: |
         # 打包为 DMG 或 ZIP 用于公证
         cd build/Build/Products/Release
