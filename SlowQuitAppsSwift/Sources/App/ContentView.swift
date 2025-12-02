@@ -17,8 +17,8 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            Label(permissionStatusText, systemImage: controller.hasAccessibilityPermission ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
-                .foregroundColor(controller.hasAccessibilityPermission ? .green : .orange)
+            Label(permissionStatusText, systemImage: controller.hasAccessibilityPermission ? "checkmark.shield.fill" : (controller.needsPermissionRestartAdvice ? "arrow.clockwise.circle" : "exclamationmark.triangle.fill")) // 根据控制器状态动态展示图标，蓝色圆箭头代表需要重启
+                .foregroundColor(controller.hasAccessibilityPermission ? .green : (controller.needsPermissionRestartAdvice ? .blue : .orange)) // 权限正常为绿色，待重启为蓝色，其余情况为橙色
 
             Button {
                 openWindow(id: "settings")
@@ -34,11 +34,22 @@ struct ContentView: View {
                 Label("检查权限…", systemImage: "shield.lefthalf.filled")
             }
 
-            if !controller.hasAccessibilityPermission {
+            if !controller.hasAccessibilityPermission { // 仅在尚未完全获得辅助功能权限时显示辅助操作
                 Button {
-                    controller.openAccessibilitySettings()
+                    controller.openAccessibilitySettings() // 引导用户打开系统设置页面勾选权限
                 } label: {
-                    Label("打开辅助功能设置…", systemImage: "gearshape.2")
+                    Label("打开辅助功能设置…", systemImage: "gearshape.2") // 使用齿轮图标暗示系统设置入口
+                }
+                if controller.needsPermissionRestartAdvice { // 如果控制器判断用户已开始授权流程，则提示必须重启
+                    Text("若已在系统中勾选 SlowQuitAppsSwift，需要重新启动本应用后权限才会生效。") // 解释 macOS 的限制，避免用户误解
+                        .font(.footnote) // 使用注脚大小平衡视觉层级
+                        .foregroundColor(.secondary) // 使用次要颜色强调这是提示文本
+                        .padding(.horizontal, 4) // 略微增加两侧间距，避免文字紧贴按钮
+                    Button {
+                        controller.restartAfterManualPermissionConfirmation() // 用户确认已授权后，主动触发重启
+                    } label: {
+                        Label("我已完成授权，立即重启", systemImage: "arrow.clockwise") // 给出明确按钮说明与旋转箭头图标
+                    }
                 }
             }
 
@@ -116,21 +127,34 @@ struct SettingsView: View {
                 GroupBox("辅助功能权限") {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 12) {
-                            Image(systemName: controller.hasAccessibilityPermission ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
-                                .foregroundColor(controller.hasAccessibilityPermission ? .green : .orange)
-                                .font(.system(size: 28))
+                            Image(systemName: controller.hasAccessibilityPermission ? "checkmark.shield.fill" : (controller.needsPermissionRestartAdvice ? "arrow.clockwise.circle" : "exclamationmark.triangle.fill")) // 设置视图顶部图标，与菜单一致展示当前权限状态
+                                .foregroundColor(controller.hasAccessibilityPermission ? .green : (controller.needsPermissionRestartAdvice ? .blue : .orange)) // 根据不同状态渲染颜色，蓝色表示等待重启
+                                .font(.system(size: 28)) // 使用较大的图标尺寸提升可读性
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(controller.hasAccessibilityPermission ? "已获得辅助功能权限" : "尚未获得辅助功能权限")
-                                    .font(.headline)
-                                Text("SlowQuitAppsSwift 需要辅助功能才能监听 Cmd+Q。")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                Text(controller.hasAccessibilityPermission ? "已获得辅助功能权限" : (controller.needsPermissionRestartAdvice ? "已授权，需重启应用" : "尚未获得辅助功能权限")) // 文案根据状态切换，蓝色状态强调需重启
+                                    .font(.headline) // 保持标题字体层级
+                                Text(controller.needsPermissionRestartAdvice ? "macOS 会在应用重新启动后启用新的权限，点击下方按钮即可自动重启。" : "SlowQuitAppsSwift 需要辅助功能才能监听 Cmd+Q。") // 给出针对性的说明
+                                    .font(.caption) // 说明文本使用 caption
+                                    .foregroundColor(.secondary) // 说明文本使用次要色
                             }
                         }
                         HStack {
-                            Button("重新检测") { controller.checkAccessibilityPermission() }
-                            Button("打开系统设置") { controller.openAccessibilitySettings() }
-                            Spacer()
+                            Button("重新检测") { controller.checkAccessibilityPermission() } // 允许用户手动刷新权限状态
+                            Button("打开系统设置") { controller.openAccessibilitySettings() } // 跳转至系统隐私设置
+                            Spacer() // 将按钮推到左侧，保持布局舒适
+                        }
+                        if controller.needsPermissionRestartAdvice { // 如果系统仍报告未授权但用户已经勾选，提供立即重启入口
+                            Divider() // 添加分割线区分提示区域
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("若已在系统设置中允许 SlowQuitAppsSwift 控制你的 Mac，请点击下方按钮重新启动本应用。") // 提示说明
+                                    .font(.caption) // 使用更小字号
+                                    .foregroundColor(.secondary) // 使用次级颜色
+                                Button {
+                                    controller.restartAfterManualPermissionConfirmation() // 触发自动重启流程
+                                } label: {
+                                    Label("我已授权，立即重启应用", systemImage: "arrow.clockwise") // 按钮文案与图标呼应重启动作
+                                }
+                            }
                         }
                     }
                     .padding()
